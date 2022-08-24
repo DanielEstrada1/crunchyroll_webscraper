@@ -1,0 +1,4 @@
+#Ignore text files,db, and jsons
+.txt
+.json
+.db
