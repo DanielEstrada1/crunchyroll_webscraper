@@ -3,6 +3,7 @@ from playwright.async_api import async_playwright, TimeoutError
 from bs4 import BeautifulSoup
 import time
 import sqlite3
+import re
 
 def run(playwright: Playwright) -> None:
     browser = playwright.chromium.launch(headless=False, slow_mo=2000)
@@ -111,8 +112,8 @@ def run(playwright: Playwright) -> None:
                         episodeObject = episode.find('a',{'class','playable-card-static__link--HjjGe'})
                         episodeTitle = episodeObject['title']
                         episodeLink = episodeObject['href']
-                        #print(episode.find('span',{'class','text--gq6o- text--is-m--pqiL- meta-tags__tag--W4JTZ'}).text)
-                        seasonEpisodes.append((episodeTitle,episodeLink))
+                        subOrDub = episode.find('span',{'class','text--gq6o- text--is-m--pqiL- meta-tags__tag--W4JTZ'}).text
+                        seasonEpisodes.append((episodeTitle,episodeLink,subOrDub))
                     allEpisodes.append(seasonEpisodes)
             
             #Still need to load data from database to compare if there's any changes to add to the database
@@ -120,17 +121,30 @@ def run(playwright: Playwright) -> None:
             #Probably need to load data before we scrape and compre the sizes as we are adding
             #If all the episodes already exist don't do any changes to database
             #If there is a change we have to notify something
-            #Also need to add in figuring out language options too
-            #Will have to get more data from episodes incase the season doesn't provide the info needed
             dbName = show[0].split("/", 3)[-1]
             dbName = dbName.replace("-", "_")
             query = '''CREATE TABLE IF NOT EXISTS ''' + dbName + ''' (season,episode,link,language)'''
             c.execute(query)
             for x in range(len(seasons)):
                 for y in range(len(allEpisodes[x])):
-                    query = '''INSERT INTO ''' + dbName + ''' VALUES (?,?,?)'''
-                    link = 'https://beta.crunchyroll.com/'+ allEpisodes[x][y][1]
-                    c.execute(query,(seasons[x],allEpisodes[x][y][0],link,"Temp"))
+                    query = '''INSERT INTO ''' + dbName + ''' VALUES (?,?,?,?)'''
+                    link = 'https://beta.crunchyroll.com'+ allEpisodes[x][y][1]
+                    language = "null"
+                    if allEpisodes[x][y][2] == "Subtitled":
+                        language = "Japanese"
+                    else:
+                        #Check what language we are
+                        if "Dub" in seasons[x]:
+                            if "(Dub)" in seasons[x]:
+                                language = "English"
+                            else:
+                                #Should be in format (Language Dub)
+                                res = re.findall(r'\(.*?\)',seasons[x])[0]
+                                res = res.strip("()")
+                                language = res.split(" ")[0]        
+                        else:
+                            language = "English"
+                    c.execute(query,(seasons[x],allEpisodes[x][y][0],link,language))
             conn.commit()
 
             showData.append(showTitle)
