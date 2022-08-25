@@ -35,7 +35,6 @@ def run(playwright: Playwright) -> None:
             showData = []
             seasons = []
             allEpisodes = []
-            allLinks = []
             dropDown = None
             seasonTitle = None
             showTitle = None
@@ -103,16 +102,18 @@ def run(playwright: Playwright) -> None:
                     
                     html = page.inner_html("#content")
                     soup = BeautifulSoup(html, 'lxml')
-                    episodes = soup.findAll(
-                        'a', {'class': 'playable-card-static__link--HjjGe'})
+                    #episodes = soup.findAll(
+                    #    'a', {'class': 'playable-card-static__link--HjjGe'})
+                    episodes = soup.findAll('div',{'class','playable-card-static--bDGCQ'})
                     seasonEpisodes = []
-                    linksEpisodes = []
 
                     for episode in episodes:
-                        seasonEpisodes.append(episode['title'])
-                        linksEpisodes.append(episode['href'])
+                        episodeObject = episode.find('a',{'class','playable-card-static__link--HjjGe'})
+                        episodeTitle = episodeObject['title']
+                        episodeLink = episodeObject['href']
+                        #print(episode.find('span',{'class','text--gq6o- text--is-m--pqiL- meta-tags__tag--W4JTZ'}).text)
+                        seasonEpisodes.append((episodeTitle,episodeLink))
                     allEpisodes.append(seasonEpisodes)
-                    allLinks.append(linksEpisodes)
             
             #Still need to load data from database to compare if there's any changes to add to the database
             #Compare data from data base with what we scrapped and if there is no change then don't add.
@@ -123,19 +124,18 @@ def run(playwright: Playwright) -> None:
             #Will have to get more data from episodes incase the season doesn't provide the info needed
             dbName = show[0].split("/", 3)[-1]
             dbName = dbName.replace("-", "_")
-            query = '''CREATE TABLE IF NOT EXISTS ''' + dbName + ''' (season,episode,href)'''
+            query = '''CREATE TABLE IF NOT EXISTS ''' + dbName + ''' (season,episode,link,language)'''
             c.execute(query)
             for x in range(len(seasons)):
                 for y in range(len(allEpisodes[x])):
                     query = '''INSERT INTO ''' + dbName + ''' VALUES (?,?,?)'''
-                    link = 'https://beta.crunchyroll.com/'+ allLinks[x][y]
-                    c.execute(query,(seasons[x],allEpisodes[x][y],link))
+                    link = 'https://beta.crunchyroll.com/'+ allEpisodes[x][y][1]
+                    c.execute(query,(seasons[x],allEpisodes[x][y][0],link,"Temp"))
             conn.commit()
 
             showData.append(showTitle)
             showData.append(seasons)
             showData.append(allEpisodes)
-            showData.append(allLinks)
             scrappedData.append(showData)
     
     # ---------------------
