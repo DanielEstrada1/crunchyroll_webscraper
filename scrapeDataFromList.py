@@ -123,28 +123,35 @@ def run(playwright: Playwright) -> None:
             #If there is a change we have to notify something
             dbName = show[0].split("/", 3)[-1]
             dbName = dbName.replace("-", "_")
-            query = '''CREATE TABLE IF NOT EXISTS ''' + dbName + ''' (season,episode,link,language)'''
+            query = '''CREATE TABLE IF NOT EXISTS ''' + dbName + ''' (season_title,season_number, episode_number, episode_title,link,language)'''
             c.execute(query)
             for x in range(len(seasons)):
+                seasonTitle = seasons[x]
                 for y in range(len(allEpisodes[x])):
-                    query = '''INSERT INTO ''' + dbName + ''' VALUES (?,?,?,?)'''
+                    query = '''INSERT INTO ''' + dbName + ''' VALUES (?,?,?,?,?,?)'''
                     link = 'https://beta.crunchyroll.com'+ allEpisodes[x][y][1]
                     language = "null"
                     if allEpisodes[x][y][2] == "Subtitled":
                         language = "Japanese"
                     else:
                         #Check what language we are
-                        if "Dub" in seasons[x]:
-                            if "(Dub)" in seasons[x]:
+                        if "Dub" in seasonTitle:
+                            if "(Dub)" in seasonTitle:
                                 language = "English"
                             else:
                                 #Should be in format (Language Dub)
-                                res = re.findall(r'\(.*?\)',seasons[x])[0]
+                                res = re.findall(r'\(.*?\)', seasonTitle)[0]
                                 res = res.strip("()")
                                 language = res.split(" ")[0]        
                         else:
                             language = "English"
-                    c.execute(query,(seasons[x],allEpisodes[x][y][0],link,language))
+                    episodeTitle = allEpisodes[x][y][0]
+                    seasonNum = seasonTitle.split(" ")[0].replace('S', '')
+                    episodeNum = episodeTitle.split(" ")[1].replace('E','')
+                    seasonName = seasonTitle.split(" ",2)[-1]
+                    episodeTitle = episodeTitle.split(" ",3)[-1]
+                    c.execute(
+                        query, (seasonName, seasonNum, episodeNum, episodeTitle, link, language))
             conn.commit()
 
             showData.append(showTitle)
