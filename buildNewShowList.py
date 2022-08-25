@@ -45,11 +45,11 @@ def run(playwright: Playwright) -> None:
     
     html = page.inner_html("//h2[contains(string(),'Last 24 Hours')]/parent::*")
     soup = BeautifulSoup(html,'lxml')
-    last24Hours = soup.findAll('a',{'class','browse-card__link--qxPB6'})
+    last24Hours = soup.findAll('a',{'class','browse-card-static__link--VtufN'})
     html = page.inner_html(
         "//h2[contains(string(),'This Past Week')]/parent::*")
     soup = BeautifulSoup(html, 'lxml')
-    lastWeek = soup.findAll('a', {'class', 'browse-card__link--qxPB6'})
+    lastWeek = soup.findAll('a', {'class', 'browse-card-static__link--VtufN'})
 
     showSet = set()
 

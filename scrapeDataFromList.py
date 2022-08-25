@@ -56,7 +56,6 @@ def run(playwright: Playwright) -> None:
                                 'class': 'dropdown-trigger--P--FX select-trigger--is-type-transparent--uPQzH trigger'})
                 seasonTitle = soup.find(
                     'h4', {'class', 'text--gq6o- text--is-semibold--AHOYN text--is-xl---ywR-'})             
-                page.pause()
                 attempts = attempts + 1
             
             if dropDown != None or seasonTitle != None:
@@ -105,7 +104,7 @@ def run(playwright: Playwright) -> None:
                     html = page.inner_html("#content")
                     soup = BeautifulSoup(html, 'lxml')
                     episodes = soup.findAll(
-                        'a', {'class': 'playable-card__link--tDxnA'})
+                        'a', {'class': 'playable-card-static__link--HjjGe'})
                     seasonEpisodes = []
                     linksEpisodes = []
 
@@ -120,6 +119,8 @@ def run(playwright: Playwright) -> None:
             #Probably need to load data before we scrape and compre the sizes as we are adding
             #If all the episodes already exist don't do any changes to database
             #If there is a change we have to notify something
+            #Also need to add in figuring out language options too
+            #Will have to get more data from episodes incase the season doesn't provide the info needed
             dbName = show[0].split("/", 3)[-1]
             dbName = dbName.replace("-", "_")
             query = '''CREATE TABLE IF NOT EXISTS ''' + dbName + ''' (season,episode,href)'''
