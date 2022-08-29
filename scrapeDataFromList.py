@@ -148,8 +148,15 @@ def run(playwright: Playwright) -> None:
                     episodeTitle = allEpisodes[x][y][0]
                     seasonNum = seasonTitle.split(" ")[0].replace('S', '')
                     episodeNum = episodeTitle.split(" ")[1].replace('E','')
+
+                    if episodeNum == "-":
+                        episodeTitle = episodeTitle.split(" ",2)[-1]
+                    else:
+                        if "SP" in episodeNum:
+                            episodeNum = episodeNum.replace('-','')
+                        episodeTitle = episodeTitle.split(" ", 3)[-1]
+                    
                     seasonName = seasonTitle.split(" ",2)[-1]
-                    episodeTitle = episodeTitle.split(" ",3)[-1]
                     c.execute(
                         query, (seasonName, seasonNum, episodeNum, episodeTitle, link, language))
             conn.commit()
