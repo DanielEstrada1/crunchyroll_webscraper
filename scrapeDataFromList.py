@@ -23,8 +23,6 @@ def run(playwright: Playwright) -> None:
         data[0] = data[0].strip()
         data[1] = data[1].strip()
         shows.append(data)
-    
-    scrappedData = []
 
     for show in shows:
         showURL = URL + show[0]
@@ -33,7 +31,6 @@ def run(playwright: Playwright) -> None:
             #We are a series so check for dropdown seasons
             #If we have seasons then loop for each season getting data
             #Every show has seasons, episodes per seasons, and links per season
-            showData = []
             seasons = []
             allEpisodes = []
             dropDown = None
@@ -116,55 +113,80 @@ def run(playwright: Playwright) -> None:
                         seasonEpisodes.append((episodeTitle,episodeLink,subOrDub))
                     allEpisodes.append(seasonEpisodes)
             
-            #Still need to load data from database to compare if there's any changes to add to the database
-            #Compare data from data base with what we scrapped and if there is no change then don't add.
-            #Probably need to load data before we scrape and compre the sizes as we are adding
-            #If all the episodes already exist don't do any changes to database
-            #If there is a change we have to notify something
-            dbName = show[0].split("/", 3)[-1]
-            dbName = dbName.replace("-", "_")
-            query = '''CREATE TABLE IF NOT EXISTS ''' + dbName + ''' (season_title,season_number, episode_number, episode_title,link,language)'''
-            c.execute(query)
-            for x in range(len(seasons)):
-                seasonTitle = seasons[x]
-                for y in range(len(allEpisodes[x])):
-                    query = '''INSERT INTO ''' + dbName + ''' VALUES (?,?,?,?,?,?)'''
-                    link = 'https://beta.crunchyroll.com'+ allEpisodes[x][y][1]
-                    language = "null"
-                    if allEpisodes[x][y][2] == "Subtitled":
-                        language = "Japanese"
-                    else:
-                        #Check what language we are
-                        if "Dub" in seasonTitle:
-                            if "(Dub)" in seasonTitle:
-                                language = "English"
-                            else:
-                                #Should be in format (Language Dub)
-                                res = re.findall(r'\(.*?\)', seasonTitle)[0]
-                                res = res.strip("()")
-                                language = res.split(" ")[0]        
+                #Might be worth checking if the table exists so I can make posts for new shows and not just new seasons/episodes
+                dbName = show[0].split("/", 3)[-1]
+                dbName = dbName.replace("-", "_")
+                checkForTablequery = '''CREATE TABLE IF NOT EXISTS ''' + dbName + ''' (season_title,season_number, episode_number, episode_title,link PRIMARY KEY,language)'''
+                c.execute(checkForTablequery)
+                for x in range(len(seasons)):
+                    seasonTitle = seasons[x]
+                    seasonName = seasonTitle.split(" ", 2)[-1]
+                    seasonName = seasonName.replace('"',' ')
+                    createSeasonPost = False
+
+                    c = conn.cursor()
+                
+                    checkForSeasonQuery = '''SELECT EXISTS(SELECT 1 FROM ''' + dbName + ''' WHERE season_title =  "''' + seasonName + '''" ) '''
+                    result = c.execute(checkForSeasonQuery).fetchone()
+                    if result[0] == 0:
+                        createSeasonPost = True
+
+                    for y in range(len(allEpisodes[x])):
+                        link = 'https://beta.crunchyroll.com'+ allEpisodes[x][y][1]
+                        language = "null"
+                        if allEpisodes[x][y][2] == "Subtitled":
+                            language = "Japanese"
                         else:
-                            language = "English"
-                    episodeTitle = allEpisodes[x][y][0]
-                    seasonNum = seasonTitle.split(" ")[0].replace('S', '')
-                    episodeNum = episodeTitle.split(" ")[1].replace('E','')
+                            #Check what language we are
+                            if "Dub" in seasonTitle:
+                                if "(Dub)" in seasonTitle:
+                                    language = "English"
+                                else:
+                                    #Should be in format (Language Dub)
+                                    res = re.findall(r'\(.*?\)', seasonTitle)[0]
+                                    res = res.strip("()")
+                                    language = res.split(" ")[0]        
+                            else:
+                                language = "English"
+                        episodeTitle = allEpisodes[x][y][0]
+                        seasonNum = seasonTitle.split(" ")[0].replace('S', '')
+                        episodeNum = episodeTitle.split(" ")[1].replace('E','')
 
-                    if episodeNum == "-":
-                        episodeTitle = episodeTitle.split(" ",2)[-1]
-                    else:
-                        if "SP" in episodeNum:
-                            episodeNum = episodeNum.replace('-','')
-                        episodeTitle = episodeTitle.split(" ", 3)[-1]
-                    
-                    seasonName = seasonTitle.split(" ",2)[-1]
-                    c.execute(
-                        query, (seasonName, seasonNum, episodeNum, episodeTitle, link, language))
-            conn.commit()
+                        if episodeNum == "-":
+                            episodeTitle = episodeTitle.split(" ",2)[-1]
+                        else:
+                            if "SP" in episodeNum:
+                                episodeNum = episodeNum.replace('-','')
+                            episodeTitle = episodeTitle.split(" ", 3)[-1]
 
-            showData.append(showTitle)
-            showData.append(seasons)
-            showData.append(allEpisodes)
-            scrappedData.append(showData)
+                        #Check database for the value worth updating? yes because of the lack of control from crunchyroll it's worth updating the column if it exits
+                        #if it doesn't exist then we are a new thing
+                        #check if the season exists? if it does exist then we don't do the work down here for episodes
+                        #so a check if it's a new season? a boolean I guess
+                        #if true then we already built the response before coming into the individual episodes
+                        #else we are a new episode but not a new season so build the response
+                        checkForEpisodeQuery = '''SELECT EXISTS(SELECT 1 FROM "''' + dbName + '''" WHERE link = "''' + link + '''")'''
+                        c = conn.cursor()
+                        episodeResult = c.execute(checkForEpisodeQuery).fetchone()
+
+                        #If the episode does not exist in the database but we are creating a post for the season don't post the episode post
+                        #Else if the episde does not exist but the season does exist we create a post for the episode
+                        if episodeResult[0] == 0 and createSeasonPost == True:
+                            c = conn.cursor()
+                            query = '''INSERT INTO ''' + dbName + ''' VALUES (?,?,?,?,?,?)'''
+                            c.execute(query, (seasonName, seasonNum,
+                                  episodeNum, episodeTitle, link, language))
+                        elif episodeResult[0] == 0 and createSeasonPost == False:
+                            c = conn.cursor()
+                            query = '''INSERT INTO ''' + dbName + ''' VALUES (?,?,?,?,?,?)'''
+                            c.execute(query, (seasonName, seasonNum,
+                                  episodeNum, episodeTitle, link, language))
+                        elif episodeResult[0] == 1:
+                            #Episode does exist so just update the data to the new one just in case it's something like where crunchyroll doesn't include the title of an episode
+                            query = '''UPDATE ''' + dbName + ''' SET season_title = ?, season_number = ?, episode_number =?, episode_title = ? , language = ? WHERE link = "''' + link + '''"'''
+                            c.execute(query,(seasonName,seasonNum,episodeNum,episodeTitle,language))
+
+                conn.commit()
     
     # ---------------------
     conn.close()

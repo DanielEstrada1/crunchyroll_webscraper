@@ -1,17 +1,49 @@
 import sqlite3
 
-conn = sqlite3.connect('mysqlite.db')
+conn = sqlite3.connect('shows.db')
+
+name = 'overlord'
+
 c = conn.cursor()
+link = 'https://beta.crunchyroll.com/watch/GY8VMKPGY/the-terrifying-duo-meowban-brothers-vs-zoro'
 
-name = 'test_Table'
+#query = '''SELECT DISTINCT link FROM ''' + name + ''''''
 
-query = '''CREATE TABLE IF NOT EXISTS ''' + name + ''' (rollno real, name text, class real)'''
+#episodes = c.execute(query)
 
-print(query)
+#showSet = set()
 
-#get the count of tables with the name
-c.execute(query)
+#query = '''SELECT EXISTS(SELECT 1 FROM ''' + name + ''' WHERE link = "''' + link + '''") '''
 
+#result = c.execute(query).fetchone()
+#print(result)
+#if result[0] == 0:
+#    print('not in database')
+#else:
+#    c = conn.cursor()
+#    query = '''SELECT * FROM ''' + name + \
+#        ''' WHERE link = "''' + link + '''"'''
+#    print(c.execute(query).fetchall())
+
+#for episode in episodes:
+#    c = conn.cursor()
+#    print(episode)
+#    q2 = '''SELECT * FROM ''' + name + ''' WHERE link = "''' + episode[0] + '''"'''
+#    print(c.execute(q2).fetchall())
+#    input()
+season_title = 'Overlord IV'
+season_number = '4'
+episode_number = '9'
+episode_title = 'essssssesefaef'
+link = "https://beta.crunchyroll.com/watch/GWDU8WM44/countdown-to-extinction"
+language = "Japanese"
+
+
+#query = '''UPDATE ''' + name + ''' SET season_title = ?, season_number = ?, episode_number =?, episode_title = ? , language = ? WHERE link = "''' + link + '''"'''
+#c.execute(query,(season_title,season_number,episode_number,episode_title,language))
+
+query = '''SELECT EXISTS(SELECT 1 FROM "''' + name + '''" WHERE link = "''' + link + '''")'''
+print(c.execute(query).fetchone())
 #commit the changes to db
 conn.commit()
 #close the connection
