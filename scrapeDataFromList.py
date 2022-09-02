@@ -82,7 +82,6 @@ def run(playwright: Playwright) -> None:
                     if seasonsCount != 1:
                         page.locator(
                             "//div[contains(@class,'dropdown-trigger--P--FX select-trigger--is-type-transparent--uPQzH trigger')]").click()
-                        season = seasons[x-1]
                         season = "//div[contains(@class,'dropdown-content__children--HW28H')]/div/div[" + str(x) + "]"
                         page.locator(season).click()
                         time.sleep(1)
@@ -109,15 +108,37 @@ def run(playwright: Playwright) -> None:
                         episodeObject = episode.find('a',{'class','playable-card-static__link--HjjGe'})
                         episodeTitle = episodeObject['title']
                         episodeLink = episodeObject['href']
-                        subOrDub = episode.find('span',{'class','text--gq6o- text--is-m--pqiL- meta-tags__tag--W4JTZ'}).text
+                        subOrDub = episode.find('span',{'class','text--gq6o- text--is-m--pqiL- meta-tags__tag--W4JTZ'})
+                        if subOrDub != None:
+                            subOrDub = subOrDub.text
+                        else:
+                            if "Dub" in seasons[x-1]:
+                                subOrDub = "Dubbed"
+                            else:
+                                subOrDub = "Subtitled"
                         seasonEpisodes.append((episodeTitle,episodeLink,subOrDub))
                     allEpisodes.append(seasonEpisodes)
             
                 #Might be worth checking if the table exists so I can make posts for new shows and not just new seasons/episodes
                 dbName = show[0].split("/", 3)[-1]
                 dbName = dbName.replace("-", "_")
-                checkForTablequery = '''CREATE TABLE IF NOT EXISTS ''' + dbName + ''' (season_title,season_number, episode_number, episode_title,link PRIMARY KEY,language)'''
-                c.execute(checkForTablequery)
+                firstLetter = dbName[0]
+                if ord(firstLetter) >= 48 and ord(firstLetter) <= 57:
+                    dbName = '_' +dbName
+
+                c = conn.cursor()
+                checkForTableQuery = ''' SELECT name FROM sqlite_master WHERE type ='table' AND name = "''' + dbName + '''"'''
+                tableResult = c.execute(checkForTableQuery).fetchone()
+                createShowPost = False
+
+                if tableResult == None:
+                    createShowPost = True
+                    c = conn.cursor()
+                    createTableQuery = '''CREATE TABLE IF NOT EXISTS ''' + dbName + \
+                    ''' (season_title,season_number, episode_number, episode_title,link PRIMARY KEY,language)'''
+                    c.execute(createTableQuery)
+
+
                 for x in range(len(seasons)):
                     seasonTitle = seasons[x]
                     seasonName = seasonTitle.split(" ", 2)[-1]
@@ -136,18 +157,41 @@ def run(playwright: Playwright) -> None:
                         language = "null"
                         if allEpisodes[x][y][2] == "Subtitled":
                             language = "Japanese"
+                            #Specific case to fix issue in Saint Seiya Knights of zodiac
+                            if "Battle for Sanctuary" in seasonTitle:
+                                if "(Japanese Audio)" not in seasonTitle:
+                                    language = "English"
                         else:
                             #Check what language we are
                             if "Dub" in seasonTitle:
-                                if "(Dub)" in seasonTitle:
+                                if "(Dub)" in seasonTitle or "(Dubbed)" in seasonTitle:
                                     language = "English"
                                 else:
                                     #Should be in format (Language Dub)
-                                    res = re.findall(r'\(.*?\)', seasonTitle)[0]
-                                    res = res.strip("()")
-                                    language = res.split(" ")[0]        
+                                    if ")" not in seasonTitle:
+                                        seasonTitle = seasonTitle + ")"
+                                    res = re.findall(
+                                        '\([a-zA-Z]+ Dub\)', seasonTitle)
+                                    if not res:
+                                        fullSeasonTitle = re.findall(r'\(.*?\)', seasonTitle)
+                                        res = fullSeasonTitle[0]
+                                        res = res.strip("()")
+                                        language = res.split(" ")[-2]
+                                        test = language
+                                        #Specific Case to catch the Gintama issue
+                                        if test.replace("-","").isnumeric():
+                                            language = "English"
+
+                                    else:
+                                        res = res[0]
+                                        res = res.strip("()")
+                                        language = res.split(" ")[0]
+
                             else:
                                 language = "English"
+                                #Needed for the specific ranking of kings issue
+                                if "(Russian)" in seasonTitle:
+                                    language = "Russian"
                         episodeTitle = allEpisodes[x][y][0]
                         seasonNum = seasonTitle.split(" ")[0].replace('S', '')
                         episodeNum = episodeTitle.split(" ")[1].replace('E','')
@@ -155,7 +199,7 @@ def run(playwright: Playwright) -> None:
                         if episodeNum == "-":
                             episodeTitle = episodeTitle.split(" ",2)[-1]
                         else:
-                            if "SP" in episodeNum:
+                            if "SP" in episodeNum or "OVA" in episodeNum or "Movie" in episodeNum:
                                 episodeNum = episodeNum.replace('-','')
                             episodeTitle = episodeTitle.split(" ", 3)[-1]
 

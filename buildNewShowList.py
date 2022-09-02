@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 import time
 
 def run(playwright: Playwright) -> None:
-    browser = playwright.chromium.launch(headless=False, slow_mo=100)
+    browser = playwright.chromium.launch(headless=False, slow_mo=2000)
     context = browser.new_context(storage_state="auth.json")
     
     # Open new page
@@ -28,7 +28,7 @@ def run(playwright: Playwright) -> None:
     while True:
         html = page.inner_html('#content')
         soup = BeautifulSoup(html, 'lxml')
-        shows = soup.findAll('h2', string="Earlier")
+        shows = soup.findAll('h2', string="This Past Week")
         if(len(shows) != 0):
             page.evaluate('clearInterval(intervalID)')
             break
@@ -46,18 +46,12 @@ def run(playwright: Playwright) -> None:
     html = page.inner_html("//h2[contains(string(),'Last 24 Hours')]/parent::*")
     soup = BeautifulSoup(html,'lxml')
     last24Hours = soup.findAll('a',{'class','browse-card-static__link--VtufN'})
-    html = page.inner_html(
-        "//h2[contains(string(),'This Past Week')]/parent::*")
-    soup = BeautifulSoup(html, 'lxml')
-    lastWeek = soup.findAll('a', {'class', 'browse-card-static__link--VtufN'})
 
     showSet = set()
 
     for show in last24Hours:
         showSet.add((show['href'],show['title']))
     
-    for show in lastWeek:
-        showSet.add((show['href'], show['title']))
 
     #We need to read in the current updatedShows.txt and then compare it to the new data we've compiled
     #remove like elements from both lists so we are left with the remainder of the old list being shows that over a week old
