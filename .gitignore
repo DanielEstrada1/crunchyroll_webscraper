@@ -2,6 +2,7 @@
 *.txt
 *.json
 *.db
+*.env
 workingfile.py
 loginInfo.py
 twitterTest.py
