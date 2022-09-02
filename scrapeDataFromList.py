@@ -1,9 +1,7 @@
 from playwright.sync_api import Playwright, sync_playwright, expect
 from playwright.async_api import async_playwright, TimeoutError
 from bs4 import BeautifulSoup
-import time
-import sqlite3
-import re
+import time,sqlite3,re,tweepy
 
 def run(playwright: Playwright) -> None:
     browser = playwright.chromium.launch(headless=False, slow_mo=2000)
@@ -17,7 +15,7 @@ def run(playwright: Playwright) -> None:
 
     shows= []
 
-    f = open('testShow.txt',encoding='utf8')
+    f = open('updatedShows.txt',encoding='utf8')
     for x in f:
         data = x.split(',',1)
         data[0] = data[0].strip()
@@ -131,6 +129,11 @@ def run(playwright: Playwright) -> None:
                 tableResult = c.execute(checkForTableQuery).fetchone()
                 createShowPost = False
 
+
+                #Add Code to output to a file the data we want to include?
+                #Need to add code for making a tweet
+                #Maybe output to a file.
+                #Create them in ths file? seems the best idea to create it this wa
                 if tableResult == None:
                     createShowPost = True
                     c = conn.cursor()
@@ -149,6 +152,10 @@ def run(playwright: Playwright) -> None:
                 
                     checkForSeasonQuery = '''SELECT EXISTS(SELECT 1 FROM ''' + dbName + ''' WHERE season_title =  "''' + seasonName + '''" ) '''
                     result = c.execute(checkForSeasonQuery).fetchone()
+                    
+                    #Add Code to output to a file the data we want to include?
+                    #Need to add code for making a tweet
+                    #Maybe output to a file.
                     if result[0] == 0:
                         createSeasonPost = True
 
@@ -203,12 +210,8 @@ def run(playwright: Playwright) -> None:
                                 episodeNum = episodeNum.replace('-','')
                             episodeTitle = episodeTitle.split(" ", 3)[-1]
 
-                        #Check database for the value worth updating? yes because of the lack of control from crunchyroll it's worth updating the column if it exits
-                        #if it doesn't exist then we are a new thing
-                        #check if the season exists? if it does exist then we don't do the work down here for episodes
-                        #so a check if it's a new season? a boolean I guess
-                        #if true then we already built the response before coming into the individual episodes
-                        #else we are a new episode but not a new season so build the response
+
+                        
                         checkForEpisodeQuery = '''SELECT EXISTS(SELECT 1 FROM "''' + dbName + '''" WHERE link = "''' + link + '''")'''
                         c = conn.cursor()
                         episodeResult = c.execute(checkForEpisodeQuery).fetchone()
