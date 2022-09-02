@@ -4,5 +4,4 @@
 *.db
 *.env
 workingfile.py
-loginInfo.py
 twitterTest.py
