@@ -1,5 +1,7 @@
 from playwright.sync_api import Playwright, sync_playwright, expect
-from loginInfo import username, password
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
 def run(playwright: Playwright) -> None:
     browser = playwright.chromium.launch(headless=False,slow_mo=2000)
@@ -7,6 +9,7 @@ def run(playwright: Playwright) -> None:
 
     # Open new page
     page = context.new_page()
+
 
     # Go to https://www.crunchyroll.com/
     page.goto("https://www.crunchyroll.com/")
@@ -18,8 +21,10 @@ def run(playwright: Playwright) -> None:
     # Click input[name="login_form\[name\]"]
     page.locator("input[name=\"login_form\\[name\\]\"]").click()
 
+
     # Fill input[name="login_form\[name\]"]
-    page.locator("input[name=\"login_form\\[name\\]\"]").fill(username)
+    page.locator("input[name=\"login_form\\[name\\]\"]").fill(
+        os.environ.get('loginUser'))
 
     page.pause()
 
@@ -27,7 +32,8 @@ def run(playwright: Playwright) -> None:
     page.locator("input[name=\"login_form\\[password\\]\"]").click()
 
     # Fill input[name="login_form\[password\]"]
-    page.locator("input[name=\"login_form\\[password\\]\"]").fill(password)
+    page.locator("input[name=\"login_form\\[password\\]\"]").fill(
+        os.environ.get('password'))
 
     # Click button:has-text("Log In")
     page.locator("button:has-text(\"Log In\")").click()

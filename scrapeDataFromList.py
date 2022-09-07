@@ -1,7 +1,9 @@
 from playwright.sync_api import Playwright, sync_playwright, expect
 from playwright.async_api import async_playwright, TimeoutError
 from bs4 import BeautifulSoup
-import time,sqlite3,re,tweepy
+from dotenv import load_dotenv
+import time,sqlite3,re,tweepy,os
+
 
 def run(playwright: Playwright) -> None:
     browser = playwright.chromium.launch(headless=False, slow_mo=2000)
@@ -11,11 +13,20 @@ def run(playwright: Playwright) -> None:
 
     conn = sqlite3.connect('shows.db')
 
+    load_dotenv()
+
+    client = tweepy.Client(consumer_key=os.environ.get('consumer_key'),
+                           consumer_secret=os.environ.get('consumer_secret'),
+                           access_token=os.environ.get('access_token_key'),
+                           access_token_secret=os.environ.get(
+                               'access_token_secret'),
+                           bearer_token=os.environ.get('bearer_token'))
+
     c= conn.cursor()
 
     shows= []
 
-    f = open('updatedShows.txt',encoding='utf8')
+    f = open('testShow.txt',encoding='utf8')
     for x in f:
         data = x.split(',',1)
         data[0] = data[0].strip()
@@ -36,6 +47,8 @@ def run(playwright: Playwright) -> None:
             showTitle = None
             attempts = 0
             seasonsCount = 1
+            seasonsToTweet = set()
+            episodesToTweet = []
 
             while dropDown == None and seasonTitle == None and attempts < 5:
                 page.goto(showURL)
@@ -97,8 +110,6 @@ def run(playwright: Playwright) -> None:
                     
                     html = page.inner_html("#content")
                     soup = BeautifulSoup(html, 'lxml')
-                    #episodes = soup.findAll(
-                    #    'a', {'class': 'playable-card-static__link--HjjGe'})
                     episodes = soup.findAll('div',{'class','playable-card-static--bDGCQ'})
                     seasonEpisodes = []
 
@@ -128,14 +139,13 @@ def run(playwright: Playwright) -> None:
                 checkForTableQuery = ''' SELECT name FROM sqlite_master WHERE type ='table' AND name = "''' + dbName + '''"'''
                 tableResult = c.execute(checkForTableQuery).fetchone()
                 createShowPost = False
-
-
-                #Add Code to output to a file the data we want to include?
-                #Need to add code for making a tweet
-                #Maybe output to a file.
-                #Create them in ths file? seems the best idea to create it this wa
+                
+                #If there is not a table for the show in our database
+                #Create the table and write a tweet announcing a new show
                 if tableResult == None:
                     createShowPost = True
+                    tweetString = "New Show added to Crunchyroll Catalog\n" + showTitle + "\n" +  showURL
+                    client.create_tweet(text = tweetString)
                     c = conn.cursor()
                     createTableQuery = '''CREATE TABLE IF NOT EXISTS ''' + dbName + \
                     ''' (season_title,season_number, episode_number, episode_title,link PRIMARY KEY,language)'''
@@ -157,7 +167,8 @@ def run(playwright: Playwright) -> None:
                     #Need to add code for making a tweet
                     #Maybe output to a file.
                     if result[0] == 0:
-                        createSeasonPost = True
+                        if createShowPost == False:
+                            createSeasonPost = True
 
                     for y in range(len(allEpisodes[x])):
                         link = 'https://beta.crunchyroll.com'+ allEpisodes[x][y][1]
@@ -210,28 +221,100 @@ def run(playwright: Playwright) -> None:
                                 episodeNum = episodeNum.replace('-','')
                             episodeTitle = episodeTitle.split(" ", 3)[-1]
 
-
-                        
-                        checkForEpisodeQuery = '''SELECT EXISTS(SELECT 1 FROM "''' + dbName + '''" WHERE link = "''' + link + '''")'''
+                        checkForEpisodeQuery = '''SELECT EXISTS(SELECT 1 FROM "''' + \
+                            dbName + '''" WHERE link = "''' + link + '''")'''
                         c = conn.cursor()
                         episodeResult = c.execute(checkForEpisodeQuery).fetchone()
 
-                        #If the episode does not exist in the database but we are creating a post for the season don't post the episode post
-                        #Else if the episde does not exist but the season does exist we create a post for the episode
-                        if episodeResult[0] == 0 and createSeasonPost == True:
-                            c = conn.cursor()
-                            query = '''INSERT INTO ''' + dbName + ''' VALUES (?,?,?,?,?,?)'''
-                            c.execute(query, (seasonName, seasonNum,
-                                  episodeNum, episodeTitle, link, language))
-                        elif episodeResult[0] == 0 and createSeasonPost == False:
-                            c = conn.cursor()
-                            query = '''INSERT INTO ''' + dbName + ''' VALUES (?,?,?,?,?,?)'''
-                            c.execute(query, (seasonName, seasonNum,
-                                  episodeNum, episodeTitle, link, language))
-                        elif episodeResult[0] == 1:
-                            #Episode does exist so just update the data to the new one just in case it's something like where crunchyroll doesn't include the title of an episode
-                            query = '''UPDATE ''' + dbName + ''' SET season_title = ?, season_number = ?, episode_number =?, episode_title = ? , language = ? WHERE link = "''' + link + '''"'''
-                            c.execute(query,(seasonName,seasonNum,episodeNum,episodeTitle,language))
+                        # If we are creating a post for the show or the season the episode isn't in the database yet so we can just insert it
+                        # We do need to check if the episode exists however as crunchyroll can update a season title and it'll mess up our db
+                        # This however means we will cause a post for a "new" season when nothing has actually changed. We will however
+                        # Update all of our episodes to have the new sesasonName to match the updated on on crunchyroll
+                        if createShowPost == True or createSeasonPost == True:
+                            c=conn.cursor()
+                            if episodeResult[0] == 1:
+                                query = '''UPDATE ''' + dbName + ''' SET season_title = ?, season_number = ?, episode_number =?, episode_title = ? , language = ? WHERE link = "''' + link + '''"'''
+                                c.execute(query, (seasonName, seasonNum,episodeNum, episodeTitle, language))
+                            else:
+                                query = '''INSERT INTO ''' + dbName + ''' VALUES (?,?,?,?,?,?)'''
+                                c.execute(query, (seasonName, seasonNum,episodeNum, episodeTitle, link, language))
+
+                                # If we aren't a new show we know to add a post for this new season
+                                # Add current seasonName and Language to list
+                                # Having this check here ensures we are only adding valid seasons to be tweeted
+                                # If this is a new season AND the episode didn't exist before AND the show isn't new then we are a new season
+                                # If the show didn't exist before ignore tweeting seasons and if the episode already exists then it means we simply updated the 
+                                # Season name so no need to tweet a new season either
+                                if createShowPost == False:
+                                    seasonsToTweet.add((seasonName))
+                        else:
+                            #At this point we know we already have the table in the database
+                            #and we know the season also exists in the databse
+                            #Last thing we have to check is if the episode exists
+                            #If the episode exists then we simply update the values with the data we scrapped. This is
+                            #To insure we have the latest data since crunchyroll sometimes doesn't episode titles etc
+                            #If the episode doesn't exist we add it to the table and add it to our
+                            #EpisodesToTweet
+                            if episodeResult[0] == 0:
+                                c = conn.cursor()
+                                query = '''INSERT INTO ''' + dbName + ''' VALUES (?,?,?,?,?,?)'''
+                                c.execute(query, (seasonName, seasonNum,episodeNum, episodeTitle, link, language))
+                                if len(episodesToTweet) == 0:
+                                    episodesToTweet.append((seasonNum,episodeNum,episodeTitle,[(link,language)]))
+                                else:
+                                    newEpisode = True
+                                    for i in range(len(episodesToTweet)):
+                                        if episodesToTweet[i][0] == seasonNum and episodesToTweet[i][1] == episodeNum and episodesToTweet[i][2] == episodeTitle:
+                                            newEpisode = False
+                                            episodesToTweet[i][3].append((link,language))
+                                    if newEpisode:
+                                        episodesToTweet.append(
+                                            (seasonNum, episodeNum, episodeTitle, [(link, language)]))
+
+                            else:
+                                #Episode does exist so just update the data to the new one just in case it's something like where crunchyroll doesn't include the title of an episode
+                                query = '''UPDATE ''' + dbName + ''' SET season_title = ?, season_number = ?, episode_number =?, episode_title = ? , language = ? WHERE link = "''' + link + '''"'''
+                                c.execute(query, (seasonName, seasonNum,episodeNum, episodeTitle, language))
+
+                # If We didn't make a post for the show that means were either have new seasons
+                # new episodes or both
+                # If a new season is added it won't allow for new episodes to be added
+                # If a new episode exists but it's season is new it won't be added so we create messages for all season
+                # then make messages for the episodes    
+                # client.create_tweet(text = tweetString)
+
+                if createShowPost == False:
+                    seasonStarter = "New Season/s for " + showTitle + "\n" + showURL + "\n"
+                    currLength = len(seasonStarter)
+                    seasonTweetText = ""
+                    for st in seasonsToTweet:
+                        st += '\n'
+                        if(currLength + len(st) > 280):
+                            client.create_tweet(text = seasonStarter + seasonTweetText)
+                            print(seasonStarter + seasonTweetText)
+                            currLength = len(seasonStarter)
+                            seasonTweetText = st
+                        else:
+                            seasonTweetText += st
+                    if seasonTweetText != "":
+                        client.create_tweet(
+                            text=seasonStarter + seasonTweetText)
+
+                    for et in episodesToTweet:
+                        episodeStarter = "New Episode for " + showTitle + "\nS: " + et[0] + " E: " + et[1] + " Title: "  + et[2]+  "\n"
+                        currLength = len(episodeStarter)
+                        episodeTweetText = ""
+                        for subEP in et[3]:
+                            subEPLink = subEP[0] + "\n"
+                            subEPLanguage = subEP[1] + ":\n"
+                            if(currLength + len(subEPLanguage) + 24 > 280):
+                                client.create_tweet(text = episodeStarter + episodeTweetText)
+                                currLength = len(episodeStarter)
+                                episodeTweetText = subEPLanguage + subEPLink
+                            else:
+                                currLength += len(subEPLanguage) + 24
+                                episodeTweetText += subEPLanguage + subEPLink
+                        client.create_tweet(text=episodeStarter + episodeTweetText)
 
                 conn.commit()
     

@@ -51,6 +51,7 @@ def run(playwright: Playwright) -> None:
 
     for show in last24Hours:
         showSet.add((show['href'],show['title']))
+
     
 
     #We need to read in the current updatedShows.txt and then compare it to the new data we've compiled

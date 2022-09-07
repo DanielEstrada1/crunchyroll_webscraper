@@ -5,3 +5,4 @@
 *.env
 workingfile.py
 twitterTest.py
+_pycache_
