@@ -1,12 +1,17 @@
+import time
+import sqlite3
+import re
+import tweepy
+import os
+import buildNewShowList
 from playwright.sync_api import Playwright, sync_playwright, expect
 from playwright.async_api import async_playwright, TimeoutError
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-import time,sqlite3,re,tweepy,os
 
 
 def run(playwright: Playwright) -> None:
-    browser = playwright.chromium.launch(headless=True, slow_mo=2000)
+    browser = playwright.chromium.launch(headless= False, slow_mo=2000)
     context = browser.new_context(storage_state="auth.json")
     page = context.new_page()
     URL = 'https://beta.crunchyroll.com'

@@ -11,7 +11,7 @@ def run(playwright: Playwright) -> None:
         delta = datetime.datetime.now() - date_time
     
     if delta.days > 7:
-        browser = playwright.chromium.launch(headless=True,slow_mo=2000)
+        browser = playwright.chromium.launch(headless=False,slow_mo=2000)
         context = browser.new_context()
 
         # Open new page
