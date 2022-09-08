@@ -6,7 +6,7 @@ import time,sqlite3,re,tweepy,os
 
 
 def run(playwright: Playwright) -> None:
-    browser = playwright.chromium.launch(headless=False, slow_mo=2000)
+    browser = playwright.chromium.launch(headless=True, slow_mo=2000)
     context = browser.new_context(storage_state="auth.json")
     page = context.new_page()
     URL = 'https://beta.crunchyroll.com'
