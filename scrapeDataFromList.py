@@ -26,7 +26,7 @@ def run(playwright: Playwright) -> None:
 
     shows= []
 
-    f = open('testShow.txt',encoding='utf8')
+    f = open('updatedShows.txt',encoding='utf8')
     for x in f:
         data = x.split(',',1)
         data[0] = data[0].strip()
