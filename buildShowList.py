@@ -21,6 +21,7 @@ def run(playwright: Playwright) -> None:
         data = x.split(',', 1)
         data[0] = data[0].strip()
         data[1] = data[1].strip()
+        
         showSet.add((data[0],data[1]))
     
     showLength = len(showSet)

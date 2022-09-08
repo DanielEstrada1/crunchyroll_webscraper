@@ -65,6 +65,7 @@ def run(playwright: Playwright) -> None:
     with open('updatedShows.txt', 'w', encoding="utf-8") as f:
         l = list(showSet)
         l = sorted(l, key=lambda x: x[1])
+        
         for show in l:
             f.write(show[0] + ' , ' + show[1]+'\n')
     # ---------------------

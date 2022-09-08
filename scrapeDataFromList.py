@@ -50,6 +50,7 @@ def run(playwright: Playwright) -> None:
             dropDown = None
             seasonTitle = None
             showTitle = None
+            
             attempts = 0
             seasonsCount = 1
             seasonsToTweet = set()
