@@ -6,3 +6,4 @@
 workingfile.py
 twitterTest.py
 __pycache__/
+*.pyc
