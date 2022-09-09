@@ -6,13 +6,15 @@ load_dotenv()
 
 def run(playwright: Playwright) -> None:
     delta = None
+    date_time = None
     with open('time.txt', 'r') as file:
         date_time = datetime.datetime.strptime(file.read(), "%d-%b-%Y (%H:%M:%S.%f)")
         delta = datetime.datetime.now() - date_time
     
     if delta.days > 7:
+        print("logging in")
         browser = playwright.chromium.launch(headless=False,slow_mo=2000)
-        
+
         context = browser.new_context()
 
         # Open new page
@@ -54,7 +56,8 @@ def run(playwright: Playwright) -> None:
         context.close()
         browser.close()
     else:
-        print(delta.days)
+        print("Last Log In:")
+        print(date_time)
 
 with sync_playwright() as playwright:
     run(playwright)

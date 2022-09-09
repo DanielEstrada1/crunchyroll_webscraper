@@ -71,6 +71,7 @@ def run(playwright: Playwright) -> None:
     # ---------------------
     context.close()
     browser.close()
+    print("Checked New Shows")
 
 
 with sync_playwright() as playwright:

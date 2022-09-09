@@ -3,6 +3,7 @@ import sqlite3
 import re
 import tweepy
 import os
+import login
 import buildNewShowList
 from playwright.sync_api import Playwright, sync_playwright, expect
 from playwright.async_api import async_playwright, TimeoutError
@@ -45,12 +46,13 @@ def run(playwright: Playwright) -> None:
             #We are a series so check for dropdown seasons
             #If we have seasons then loop for each season getting data
             #Every show has seasons, episodes per seasons, and links per season
+            print(showURL)
             seasons = []
             allEpisodes = []
             dropDown = None
             seasonTitle = None
             showTitle = None
-            
+
             attempts = 0
             seasonsCount = 1
             seasonsToTweet = set()
