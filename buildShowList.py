@@ -1,5 +1,8 @@
 from playwright.sync_api import Playwright, sync_playwright, expect
 from bs4 import BeautifulSoup
+from pyvirtualdisplay import Display
+display = Display(visible=0, size=(1366, 768))
+display.start()
 import time
 
 def run(playwright: Playwright) -> None:
@@ -56,7 +59,7 @@ def run(playwright: Playwright) -> None:
             time.sleep(1)
 
     if len(showSet)> showLength:
-        with open('shows.txt', 'w', encoding="utf-8") as f:
+        with open('updatedShows.txt', 'w', encoding="utf-8") as f:
             l = list(showSet)
             l = sorted(l,key=lambda x:x[1])
             for show in l:
@@ -67,7 +70,7 @@ def run(playwright: Playwright) -> None:
     # ---------------------
     context.close()
     browser.close()
-
+    display.stop()
 
 with sync_playwright() as playwright:
     run(playwright)

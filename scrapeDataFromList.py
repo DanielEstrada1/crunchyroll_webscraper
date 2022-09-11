@@ -3,13 +3,15 @@ import sqlite3
 import re
 import tweepy
 import os
-import login
-import buildNewShowList
-from playwright.sync_api import Playwright, sync_playwright, expect
+#import login
+#import buildNewShowList
+from playwright.sync_api import Playwright, sync_playwright, expect, TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import async_playwright, TimeoutError
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-
+from pyvirtualdisplay import Display
+display = Display(visible = 0, size=(1366,768))
+display.start()
 
 def run(playwright: Playwright) -> None:
     browser = playwright.chromium.launch(headless= False, slow_mo=2000)
@@ -32,7 +34,7 @@ def run(playwright: Playwright) -> None:
 
     shows= []
 
-    f = open('updatedShows.txt',encoding='utf8')
+    f = open('testShow.txt',encoding='utf8')
     for x in f:
         data = x.split(',',1)
         data[0] = data[0].strip()
@@ -59,20 +61,23 @@ def run(playwright: Playwright) -> None:
             episodesToTweet = []
 
             while dropDown == None and seasonTitle == None and attempts < 5:
-                page.goto(showURL)
-                page.wait_for_url(showURL)
-
-                html = page.inner_html('#content')
-                soup = BeautifulSoup(html,'lxml')
-                showTitle = soup.find(
-                    'div', {'class', 'hero-heading-line'})
-                if showTitle != None:
-                    showTitle = showTitle.text
-                dropDown = soup.find('div', {
-                                'class': 'dropdown-trigger--P--FX select-trigger--is-type-transparent--uPQzH trigger'})
-                seasonTitle = soup.find(
-                    'h4', {'class', 'text--gq6o- text--is-semibold--AHOYN text--is-xl---ywR-'})             
-                attempts = attempts + 1
+                try:
+                    page.goto(showURL)
+                    page.wait_for_url(showURL)
+                    html = page.inner_html('#content')
+                    soup = BeautifulSoup(html,'lxml')
+                    showTitle = soup.find('div', {'class', 'hero-heading-line'})
+                    if showTitle != None:
+                        showTitle = showTitle.text
+                    dropDown = soup.find('div', {'class': 'dropdown-trigger--P--FX select-trigger--is-type-transparent--uPQzH trigger'})
+                    seasonTitle = soup.find('h4', {'class', 'text--gq6o- text--is-semibold--AHOYN text--is-xl---ywR-'})             
+                    attempts = attempts + 1
+                except PlaywrightTimeoutError:
+                    context.close()
+                    browser.close()
+                    browser = playwright.chromium.launch(headless = False, slow_mo = 2000)
+                    context = browser.new_context(storage_state="auth.json")
+                    page = context.new_page()
             
             if dropDown != None or seasonTitle != None:
                 if dropDown != None:
@@ -153,7 +158,7 @@ def run(playwright: Playwright) -> None:
                 if tableResult == None:
                     createShowPost = True
                     tweetString = "New Show added to Crunchyroll Catalog\n" + showTitle + "\n" +  showURL
-                    client.create_tweet(text = tweetString)
+                    #client.create_tweet(text = tweetString)
                     c = conn.cursor()
                     createTableQuery = '''CREATE TABLE IF NOT EXISTS ''' + dbName + \
                     ''' (season_title,season_number, episode_number, episode_title,link PRIMARY KEY,language)'''
@@ -298,15 +303,15 @@ def run(playwright: Playwright) -> None:
                     for st in seasonsToTweet:
                         st += '\n'
                         if(currLength + len(st) > 280):
-                            client.create_tweet(text = seasonStarter + seasonTweetText)
+                            #client.create_tweet(text = seasonStarter + seasonTweetText)
                             print(seasonStarter + seasonTweetText)
                             currLength = len(seasonStarter)
                             seasonTweetText = st
                         else:
                             seasonTweetText += st
                     if seasonTweetText != "":
-                        client.create_tweet(
-                            text=seasonStarter + seasonTweetText)
+                       print("")
+                       #client.create_tweet(text=seasonStarter + seasonTweetText)
 
                     for et in episodesToTweet:
                         episodeStarter = "New Episode for " + showTitle + "\nS: " + et[0] + " E: " + et[1] + " Title: "  + et[2]+  "\n"
@@ -316,13 +321,13 @@ def run(playwright: Playwright) -> None:
                             subEPLink = subEP[0] + "\n"
                             subEPLanguage = subEP[1] + ":\n"
                             if(currLength + len(subEPLanguage) + 24 > 280):
-                                client.create_tweet(text = episodeStarter + episodeTweetText)
+                                #client.create_tweet(text = episodeStarter + episodeTweetText)
                                 currLength = len(episodeStarter)
                                 episodeTweetText = subEPLanguage + subEPLink
                             else:
                                 currLength += len(subEPLanguage) + 24
                                 episodeTweetText += subEPLanguage + subEPLink
-                        client.create_tweet(text=episodeStarter + episodeTweetText)
+                        #client.create_tweet(text=episodeStarter + episodeTweetText)
 
                 conn.commit()
     
@@ -330,6 +335,7 @@ def run(playwright: Playwright) -> None:
     conn.close()
     context.close()
     browser.close()
+    display.stop()
 
 
 with sync_playwright() as playwright:
