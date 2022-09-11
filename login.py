@@ -14,6 +14,7 @@ def run(playwright: Playwright) -> None:
     with open('time.txt', 'r') as file:
         date_time = datetime.datetime.strptime(file.read(), "%d-%b-%Y (%H:%M:%S.%f)")
         print(date_time)
+        
         delta = datetime.datetime.now() - date_time
     
     if delta.days > 7:

@@ -27,6 +27,7 @@ def run(playwright: Playwright) -> None:
     """
     )
 
+    
     prev_height = None
     while True:
         html = page.inner_html('#content')
