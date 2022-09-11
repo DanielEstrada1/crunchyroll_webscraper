@@ -1,7 +1,11 @@
 from playwright.sync_api import Playwright, sync_playwright, expect
 import os
 import datetime
+from pyvirtualdisplay import Display
+display = Display(visible=0, size=(1366,768))
+display.start()
 from dotenv import load_dotenv
+
 load_dotenv()
 
 def run(playwright: Playwright) -> None:
@@ -9,6 +13,7 @@ def run(playwright: Playwright) -> None:
     date_time = None
     with open('time.txt', 'r') as file:
         date_time = datetime.datetime.strptime(file.read(), "%d-%b-%Y (%H:%M:%S.%f)")
+        print(date_time)
         delta = datetime.datetime.now() - date_time
     
     if delta.days > 7:
@@ -26,7 +31,6 @@ def run(playwright: Playwright) -> None:
         # Go to https://www.crunchyroll.com/
         page.goto("https://www.crunchyroll.com/")
 
-        page.pause()
 
         # Click text=Login Queue Random Search >> svg >> nth=0
         page.locator("text=Login Queue Random Search >> svg").first.click()
@@ -53,13 +57,14 @@ def run(playwright: Playwright) -> None:
         # ---------------------
         context.storage_state(path="auth.json")
         with open('time.txt', 'w') as file:
-            file.write(datetime.datetime.now().strftime(
-                "%d-%b-%Y (%H:%M:%S.%f)"))
+            file.write(datetime.datetime.now().strftime("%d-%b-%Y (%H:%M:%S.%f)"))
         context.close()
         browser.close()
+        display.stop()
     else:
         print("Last Log In:")
         print(date_time)
+        display.stop()
 
 with sync_playwright() as playwright:
     run(playwright)

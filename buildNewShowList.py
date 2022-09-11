@@ -1,6 +1,9 @@
 from playwright.sync_api import Playwright, sync_playwright, expect
 from bs4 import BeautifulSoup
 import time
+from pyvirtualdisplay import Display
+display = Display(visible = 0, size =(1366,768))
+display.start()
 
 def run(playwright: Playwright) -> None:
     browser = playwright.chromium.launch(headless=False, slow_mo=2000)
@@ -71,6 +74,7 @@ def run(playwright: Playwright) -> None:
     # ---------------------
     context.close()
     browser.close()
+    display.stop()
     print("Checked New Shows")
 
 
