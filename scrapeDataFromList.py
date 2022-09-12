@@ -81,45 +81,73 @@ def run(playwright: Playwright) -> None:
             
             if dropDown != None or seasonTitle != None:
                 if dropDown != None:
-                    #Click the dropDown menu to load all seasons
-                    page.locator(
-                        "//div[contains(@class,'dropdown-trigger--P--FX select-trigger--is-type-transparent--uPQzH trigger')]").click()
-                    html = page.inner_html('#content')
-                    soup = BeautifulSoup(html, 'lxml')
-                    #Find all seasons
-                    titles = soup.find_all(
-                        'div', {'class': 'select-content__option--gq8Uo'})
-                    #For each season we found get the name of each one
-                    for season in titles:
-                        title = season.find(
-                            'span', {'class': 'middle-truncation__text--xv72L'})
-                        seasons.append(title.text)
-                    #Click the dropdown menu to close it
-                    page.locator(
-                        "//div[contains(@class,'dropdown-trigger--P--FX dropdown-trigger--is-open--DP-0Q select-trigger--is-opened--Kk8za select-trigger--is-type-transparent--uPQzH trigger')]").click()
-                    #Save how many seasons we have
-                    seasonsCount = len(seasons)
+                    timeoutCheck = True
+                    while timeoutCheck:
+                        try:
+                            # Click the dropDown menu to load all seasons
+                            page.locator(
+                                "//div[contains(@class,'dropdown-trigger--P--FX select-trigger--is-type-transparent--uPQzH trigger')]").click()
+                            html = page.inner_html('#content')
+                            soup = BeautifulSoup(html, 'lxml')
+                    
+                            # Find all seasons
+                            titles = soup.find_all(
+                                'div', {'class': 'select-content__option--gq8Uo'})
+                    
+                            # For each season we found get the name of each one
+                            for season in titles:
+                                title = season.find(
+                                    'span', {'class': 'middle-truncation__text--xv72L'})
+                                seasons.append(title.text)
+                    
+                            # Click the dropdown menu to close it
+                            page.locator(
+                                "//div[contains(@class,'dropdown-trigger--P--FX dropdown-trigger--is-open--DP-0Q select-trigger--is-opened--Kk8za select-trigger--is-type-transparent--uPQzH trigger')]").click()
+                    
+                            # Save how many seasons we have
+                            seasonsCount = len(seasons)
+                            timeoutCheck = False
+                        except PlaywrightTimeoutError:
+                            # Reset the webpage incase any of these errored and do it again
+                            # assuming the webpage doesn't error at this point
+                            print("getting seasons")
+                            timeoutCheck = True
+                            page.goto(showURL)
+                            page.wait_for_url(showURL)
+                            seasons = []
                 else:
                     seasons.append(seasonTitle.text)
-                
+
                 for x in range(1, seasonsCount + 1):
-                    if seasonsCount != 1:
-                        page.locator(
-                            "//div[contains(@class,'dropdown-trigger--P--FX select-trigger--is-type-transparent--uPQzH trigger')]").click()
-                        season = "//div[contains(@class,'dropdown-content__children--HW28H')]/div/div[" + str(x) + "]"
-                        page.locator(season).click()
-                        time.sleep(1)
+                    # Probably worth wrapping this section in a try catch and loop again
+                    # this way if either the show more of the season part times out
+                    # we reset and have it click the proper season again
+                    timeoutCheck = True
+                    while timeoutCheck:
+                        try:
+                            if seasonsCount != 1:
+                                page.locator(
+                                    "//div[contains(@class,'dropdown-trigger--P--FX select-trigger--is-type-transparent--uPQzH trigger')]").click()
+                                season = "//div[contains(@class,'dropdown-content__children--HW28H')]/div/div[" + str(x) + "]"
+                                page.locator(season).click()
+                                time.sleep(1)
                     
-                    html = page.inner_html('#content')
-                    soup = BeautifulSoup(html, 'lxml')
-                    hasMore = soup.find("span",text="Show More")
-                    loadMore = False
-                    if hasMore != None:
-                        loadMore = True
+                            html = page.inner_html('#content')
+                            soup = BeautifulSoup(html, 'lxml')
+                            hasMore = soup.find("span",text="Show More")
+                            loadMore = False
+                            if hasMore != None:
+                                loadMore = True
                     
-                    if loadMore:
-                        page.locator("span:has-text(\"Show More\")").click()
-                        time.sleep(1)
+                            if loadMore:
+                                page.locator("span:has-text(\"Show More\")").click()
+                                time.sleep(1)
+                            timeoutCheck = False
+                        except PlaywrightTimeoutError:
+                            print("Season/Show More")
+                            timeoutCheck = True
+                            page.goto(showURL)
+                            page.wait_for_url(showURL)
                     
                     html = page.inner_html("#content")
                     soup = BeautifulSoup(html, 'lxml')
