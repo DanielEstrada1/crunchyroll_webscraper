@@ -34,7 +34,7 @@ def run(playwright: Playwright) -> None:
 
     shows= []
 
-    f = open('updatedShows.txt',encoding='utf8')
+    f = open('testShow.txt',encoding='utf8')
     for x in f:
         data = x.split(',',1)
         data[0] = data[0].strip()
@@ -112,6 +112,13 @@ def run(playwright: Playwright) -> None:
                             # assuming the webpage doesn't error at this point
                             print("getting seasons")
                             timeoutCheck = True
+                            context.close()
+                            browser.close()
+                            browser = playwright.chromium.launch(
+                                headless=False, slow_mo=2000)
+                            context = browser.new_context(
+                                storage_state="auth.json")
+                            page = context.new_page()
                             page.goto(showURL)
                             page.wait_for_url(showURL)
                             seasons = []
@@ -146,6 +153,11 @@ def run(playwright: Playwright) -> None:
                         except PlaywrightTimeoutError:
                             print("Season/Show More")
                             timeoutCheck = True
+                            context.close()
+                            browser.close()
+                            browser = playwright.chromium.launch(headless=False, slow_mo=2000)
+                            context = browser.new_context(storage_state="auth.json")
+                            page = context.new_page()
                             page.goto(showURL)
                             page.wait_for_url(showURL)
                     
