@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 from playwright.sync_api import Playwright, sync_playwright, expect
 from bs4 import BeautifulSoup
 import time
@@ -55,8 +56,6 @@ def run(playwright: Playwright) -> None:
 
     for show in last24Hours:
         showSet.add((show['href'],show['title']))
-
-    
 
     #We need to read in the current updatedShows.txt and then compare it to the new data we've compiled
     #remove like elements from both lists so we are left with the remainder of the old list being shows that over a week old

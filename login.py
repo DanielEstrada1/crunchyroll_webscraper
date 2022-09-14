@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 from playwright.sync_api import Playwright, sync_playwright, expect
 import os
 import datetime
