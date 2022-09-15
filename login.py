@@ -25,9 +25,6 @@ def run(playwright: Playwright) -> None:
         # Open new page
         page = context.new_page()
 
-        page.pause()
-
-
         # Go to https://www.crunchyroll.com/
         page.goto("https://www.crunchyroll.com/")
 
