@@ -18,6 +18,8 @@ def run(playwright: Playwright) -> None:
     
     if delta.days > 7:
         print("logging in")
+        print("Time Now:")
+        print(datetime.datetime.now())
         browser = playwright.chromium.launch(headless=False,slow_mo=2000)
 
         context = browser.new_context()
@@ -61,6 +63,8 @@ def run(playwright: Playwright) -> None:
     else:
         print("Last Log In:")
         print(date_time)
+        print("Time Now:")
+        print(datetime.datetime.now())
         display.stop()
 
 with sync_playwright() as playwright:

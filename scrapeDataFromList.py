@@ -4,8 +4,8 @@ import sqlite3
 import re
 import tweepy
 import os
-import login
-import buildNewShowList
+#import login
+#import buildNewShowList
 from playwright.sync_api import Playwright, sync_playwright, expect, TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import async_playwright, TimeoutError
 from bs4 import BeautifulSoup
@@ -35,7 +35,7 @@ def run(playwright: Playwright) -> None:
 
     shows= []
 
-    f = open('updatedShows.txt',encoding='utf8')
+    f = open('testShow.txt',encoding='utf8')
     for x in f:
         data = x.split(',',1)
         data[0] = data[0].strip()
@@ -79,7 +79,9 @@ def run(playwright: Playwright) -> None:
                     browser = playwright.chromium.launch(headless = False, slow_mo = 2000)
                     context = browser.new_context(storage_state="auth.json")
                     page = context.new_page()
-            
+            if attempts == 5:
+                print("Failed on show: " + showURL)
+
             if dropDown != None or seasonTitle != None:
                 if dropDown != None:
                     timeoutCheck = True
@@ -125,6 +127,9 @@ def run(playwright: Playwright) -> None:
                             seasons = []
                 else:
                     seasons.append(seasonTitle.text)
+
+
+                print(seasons)
 
                 for x in range(1, seasonsCount + 1):
                     # Probably worth wrapping this section in a try catch and loop again
@@ -217,9 +222,7 @@ def run(playwright: Playwright) -> None:
                     checkForSeasonQuery = '''SELECT EXISTS(SELECT 1 FROM ''' + dbName + ''' WHERE season_title =  "''' + seasonName + '''" ) '''
                     result = c.execute(checkForSeasonQuery).fetchone()
                     
-                    #Add Code to output to a file the data we want to include?
-                    #Need to add code for making a tweet
-                    #Maybe output to a file.
+                    
                     if result[0] == 0:
                         if createShowPost == False:
                             createSeasonPost = True
@@ -337,6 +340,8 @@ def run(playwright: Playwright) -> None:
                 # then make messages for the episodes    
                 # client.create_tweet(text = tweetString)
 
+                print(seasonsToTweet)
+                print(episodesToTweet)
                 if createShowPost == False:
                     seasonStarter = "New Season/s for " + showTitle + "\n" + showURL + "\n"
                     currLength = len(seasonStarter)
