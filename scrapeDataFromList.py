@@ -4,8 +4,9 @@ import sqlite3
 import re
 import tweepy
 import os
-#import login
-#import buildNewShowList
+import datetime
+import login
+import buildNewShowList
 from playwright.sync_api import Playwright, sync_playwright, expect, TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import async_playwright, TimeoutError
 from bs4 import BeautifulSoup
@@ -15,7 +16,7 @@ display = Display(visible = 0, size=(1366,768))
 display.start()
 
 def run(playwright: Playwright) -> None:
-    browser = playwright.chromium.launch(headless= False, slow_mo=2000)
+    browser = playwright.chromium.launch(headless= False, slow_mo=2000,channel="chrome")
     context = browser.new_context(storage_state="auth.json")
     page = context.new_page()
     URL = 'https://beta.crunchyroll.com'
@@ -35,7 +36,7 @@ def run(playwright: Playwright) -> None:
 
     shows= []
 
-    f = open('testShow.txt',encoding='utf8')
+    f = open('updatedShows.txt',encoding='utf8')
     for x in f:
         data = x.split(',',1)
         data[0] = data[0].strip()
@@ -72,6 +73,7 @@ def run(playwright: Playwright) -> None:
                         showTitle = showTitle.text
                     dropDown = soup.find('div', {'class': 'dropdown-trigger--P--FX select-trigger--is-type-transparent--uPQzH trigger'})
                     seasonTitle = soup.find('h4', {'class', 'text--gq6o- text--is-semibold--AHOYN text--is-xl---ywR-'})             
+                    
                     attempts = attempts + 1
                 except PlaywrightTimeoutError:
                     context.close()
@@ -96,9 +98,13 @@ def run(playwright: Playwright) -> None:
                             # Find all seasons
                             titles = soup.find_all(
                                 'div', {'class': 'select-content__option--gq8Uo'})
+                            
                     
                             # For each season we found get the name of each one
+                            
                             for season in titles:
+                                #middle-truncation__text--xv72L
+                                #'text--gq6o- text--is-m--pqiL-'
                                 title = season.find(
                                     'span', {'class': 'middle-truncation__text--xv72L'})
                                 seasons.append(title.text)
@@ -127,11 +133,12 @@ def run(playwright: Playwright) -> None:
                             seasons = []
                 else:
                     seasons.append(seasonTitle.text)
-
-
-                print(seasons)
-
-                for x in range(1, seasonsCount + 1):
+                
+                
+                x = 1
+                lastEpisode = ""
+                lastEpisodeCount = 0
+                while x < (seasonsCount + 1):
                     # Probably worth wrapping this section in a try catch and loop again
                     # this way if either the show more of the season part times out
                     # we reset and have it click the proper season again
@@ -143,7 +150,7 @@ def run(playwright: Playwright) -> None:
                                     "//div[contains(@class,'dropdown-trigger--P--FX select-trigger--is-type-transparent--uPQzH trigger')]").click()
                                 season = "//div[contains(@class,'dropdown-content__children--HW28H')]/div/div[" + str(x) + "]"
                                 page.locator(season).click()
-                                time.sleep(1)
+                                page.wait_for_load_state('networkidle')
                     
                             html = page.inner_html('#content')
                             soup = BeautifulSoup(html, 'lxml')
@@ -154,7 +161,7 @@ def run(playwright: Playwright) -> None:
                     
                             if loadMore:
                                 page.locator("span:has-text(\"Show More\")").click()
-                                time.sleep(1)
+                                page.wait_for_load_state('networkidle')
                             timeoutCheck = False
                         except PlaywrightTimeoutError:
                             print("Season/Show More")
@@ -167,9 +174,16 @@ def run(playwright: Playwright) -> None:
                             page.goto(showURL)
                             page.wait_for_url(showURL)
                     
+                    if lastEpisode != seasons[x-1]:
+                        lastEpisodeCount = 0
+                        lastEpisode = seasons[x-1]
+                    else:
+                        lastEpisodeCount = lastEpisodeCount + 1
+
                     html = page.inner_html("#content")
                     soup = BeautifulSoup(html, 'lxml')
                     episodes = soup.findAll('div',{'class','playable-card-static--bDGCQ'})
+                    testing = soup.findAll('div',{'class','card'})
                     seasonEpisodes = []
 
                     for episode in episodes:
@@ -185,6 +199,11 @@ def run(playwright: Playwright) -> None:
                             else:
                                 subOrDub = "Subtitled"
                         seasonEpisodes.append((episodeTitle,episodeLink,subOrDub))
+                    print(seasons[x-1])
+                    print(len(seasonEpisodes))
+                    if len(seasonEpisodes) == 0 and lastEpisodeCount < 5:
+                        x = x - 1
+                    x = x + 1
                     allEpisodes.append(seasonEpisodes)
             
                 #Might be worth checking if the table exists so I can make posts for new shows and not just new seasons/episodes
@@ -207,7 +226,7 @@ def run(playwright: Playwright) -> None:
                     client.create_tweet(text = tweetString)
                     c = conn.cursor()
                     createTableQuery = '''CREATE TABLE IF NOT EXISTS ''' + dbName + \
-                    ''' (season_title,season_number, episode_number, episode_title,link PRIMARY KEY,language)'''
+                    ''' (season_title,season_number, episode_number, episode_title,link PRIMARY KEY, url_title, language)'''
                     c.execute(createTableQuery)
 
 
@@ -277,6 +296,10 @@ def run(playwright: Playwright) -> None:
                             if "SP" in episodeNum or "OVA" in episodeNum or "Movie" in episodeNum:
                                 episodeNum = episodeNum.replace('-','')
                             episodeTitle = episodeTitle.split(" ", 3)[-1]
+                        
+                        urlSplit = link.rsplit('/',1)
+                        urltitle = urlSplit[1]
+                        link = urlSplit[0]
 
                         checkForEpisodeQuery = '''SELECT EXISTS(SELECT 1 FROM "''' + \
                             dbName + '''" WHERE link = "''' + link + '''")'''
@@ -290,11 +313,11 @@ def run(playwright: Playwright) -> None:
                         if createShowPost == True or createSeasonPost == True:
                             c=conn.cursor()
                             if episodeResult[0] == 1:
-                                query = '''UPDATE ''' + dbName + ''' SET season_title = ?, season_number = ?, episode_number =?, episode_title = ? , language = ? WHERE link = "''' + link + '''"'''
-                                c.execute(query, (seasonName, seasonNum,episodeNum, episodeTitle, language))
+                                query = '''UPDATE ''' + dbName + ''' SET season_title = ?, season_number = ?, episode_number =?, episode_title = ? , url_title = ?, language = ? WHERE link = "''' + link + '''"'''
+                                c.execute(query, (seasonName, seasonNum,episodeNum, episodeTitle, urltitle, language))
                             else:
-                                query = '''INSERT INTO ''' + dbName + ''' VALUES (?,?,?,?,?,?)'''
-                                c.execute(query, (seasonName, seasonNum,episodeNum, episodeTitle, link, language))
+                                query = '''INSERT INTO ''' + dbName + ''' VALUES (?,?,?,?,?,?,?)'''
+                                c.execute(query, (seasonName, seasonNum,episodeNum, episodeTitle, link, urltitle, language))
 
                                 # If we aren't a new show we know to add a post for this new season
                                 # Add current seasonName and Language to list
@@ -314,24 +337,24 @@ def run(playwright: Playwright) -> None:
                             #EpisodesToTweet
                             if episodeResult[0] == 0:
                                 c = conn.cursor()
-                                query = '''INSERT INTO ''' + dbName + ''' VALUES (?,?,?,?,?,?)'''
-                                c.execute(query, (seasonName, seasonNum,episodeNum, episodeTitle, link, language))
+                                query = '''INSERT INTO ''' + dbName + ''' VALUES (?,?,?,?,?,?,?)'''
+                                c.execute(query, (seasonName, seasonNum,episodeNum, episodeTitle, link, urltitle, language))
                                 if len(episodesToTweet) == 0:
-                                    episodesToTweet.append((seasonNum,episodeNum,episodeTitle,[(link,language)]))
+                                    episodesToTweet.append((seasonNum,episodeNum,episodeTitle,[(link+'/'+urltitle,language)]))
                                 else:
                                     newEpisode = True
                                     for i in range(len(episodesToTweet)):
                                         if episodesToTweet[i][0] == seasonNum and episodesToTweet[i][1] == episodeNum and episodesToTweet[i][2] == episodeTitle:
                                             newEpisode = False
-                                            episodesToTweet[i][3].append((link,language))
+                                            episodesToTweet[i][3].append((link+'/'+urltitle,language))
                                     if newEpisode:
                                         episodesToTweet.append(
-                                            (seasonNum, episodeNum, episodeTitle, [(link, language)]))
+                                            (seasonNum, episodeNum, episodeTitle, [(link+'/'+urltitle, language)]))
 
                             else:
                                 #Episode does exist so just update the data to the new one just in case it's something like where crunchyroll doesn't include the title of an episode
-                                query = '''UPDATE ''' + dbName + ''' SET season_title = ?, season_number = ?, episode_number =?, episode_title = ? , language = ? WHERE link = "''' + link + '''"'''
-                                c.execute(query, (seasonName, seasonNum,episodeNum, episodeTitle, language))
+                                query = '''UPDATE ''' + dbName + ''' SET season_title = ?, season_number = ?, episode_number =?, episode_title = ? , url_title = ?, language = ? WHERE link = "''' + link + '''"'''
+                                c.execute(query, (seasonName, seasonNum,episodeNum, episodeTitle, urltitle, language))
 
                 # If We didn't make a post for the show that means were either have new seasons
                 # new episodes or both
@@ -350,13 +373,14 @@ def run(playwright: Playwright) -> None:
                         st += '\n'
                         if(currLength + len(st) > 280):
                             client.create_tweet(text = seasonStarter + seasonTweetText)
-                            print(seasonStarter + seasonTweetText)
-                            currLength = len(seasonStarter)
                             seasonTweetText = st
+                            currLength = len(seasonStarter) + len(seasonTweetText)
                         else:
                             seasonTweetText += st
+                            currLength = currLength + len(seasonTweetText)
+                            
                     if seasonTweetText != "":
-                       client.create_tweet(text=seasonStarter + seasonTweetText)
+                        client.create_tweet(text=seasonStarter + seasonTweetText)
 
                     for et in episodesToTweet:
                         episodeStarter = "New Episode for " + showTitle + "\nS: " + et[0] + " E: " + et[1] + " Title: "  + et[2]+  "\n"
@@ -381,6 +405,7 @@ def run(playwright: Playwright) -> None:
     context.close()
     browser.close()
     display.stop()
+    print(datetime.datetime.now())
 
 
 with sync_playwright() as playwright:

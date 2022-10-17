@@ -1,5 +1,6 @@
 #!/usr/bin/python3
-from playwright.sync_api import Playwright, sync_playwright, expect
+from playwright.sync_api import Playwright, sync_playwright, expect, TimeoutError as PlaywrightTimeoutError
+from playwright.async_api import async_playwright, TimeoutError
 import os
 import datetime
 from pyvirtualdisplay import Display
@@ -21,15 +22,20 @@ def run(playwright: Playwright) -> None:
         print("Time Now:")
         print(datetime.datetime.now())
         browser = playwright.chromium.launch(headless=False,slow_mo=2000)
-
+        #browser = playwright.firefox.launch(headless=False, slow_mo=2000)
         context = browser.new_context()
 
         # Open new page
         page = context.new_page()
 
         # Go to https://www.crunchyroll.com/
-        page.goto("https://www.crunchyroll.com/")
-
+        try:
+            page.goto("https://www.crunchyroll.com/")
+        except PlaywrightTimeoutError:
+            html = page.inner_html('#content')
+            soup = BeautifulSoup(html,'lxml')
+            print(soup)
+            exit()
 
         # Click text=Login Queue Random Search >> svg >> nth=0
         page.locator("text=Login Queue Random Search >> svg").first.click()

@@ -8,6 +8,7 @@ display.start()
 
 def run(playwright: Playwright) -> None:
     browser = playwright.chromium.launch(headless=False, slow_mo=2000)
+    #browser = playwright.firefox.launch(headless=False, slow_mo=2000)
     context = browser.new_context(storage_state="auth.json")
     
     # Open new page
@@ -56,17 +57,7 @@ def run(playwright: Playwright) -> None:
 
     for show in shows:
         card = show.find('a',{'browse-card-static__link--VtufN'})
-        time = show.find('span', {'class', 'text--gq6o- text--is-semibold--AHOYN text--is-s--JP2oa browse-card-static__newly-added-label--w2myX'})
-        
-        #showSet.add((card['href'],card['title']))
-        if card != None:
-            if time == None:
-                showSet.add((card['href'], card['title']))
-            else:
-                if "minutes" in time.text:
-                    showSet.add((card['href'], card['title']))
-                if "seconds" in time.text:
-                    showSet.add((card['href'], card['title']))
+        showSet.add((card['href'],card['title']))
 
     with open('updatedShows.txt', 'w', encoding="utf-8") as f:
         l = list(showSet)
