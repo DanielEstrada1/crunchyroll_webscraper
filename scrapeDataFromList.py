@@ -19,9 +19,9 @@ def run(playwright: Playwright) -> None:
     browser = playwright.chromium.launch(headless= False, slow_mo=2000,channel="chrome")
     context = browser.new_context(storage_state="auth.json")
     page = context.new_page()
-    URL = 'https://beta.crunchyroll.com'
+    URL = 'https://www.crunchyroll.com'
 
-    conn = sqlite3.connect('shows.db')
+    conn = sqlite3.connect('allEpisodes.db')
 
     load_dotenv()
 
@@ -33,6 +33,8 @@ def run(playwright: Playwright) -> None:
                            bearer_token=os.environ.get('bearer_token'))
 
     c= conn.cursor()
+    createTableQuery = '''CREATE TABLE IF NOT EXISTS episodes(show_title,season_title,season_number INTEGER, episode_number, episode_title,link PRIMARY KEY, url_title, language)'''
+    c.execute(createTableQuery)
 
     shows= []
 
@@ -101,7 +103,6 @@ def run(playwright: Playwright) -> None:
                             
                     
                             # For each season we found get the name of each one
-                            
                             for season in titles:
                                 #middle-truncation__text--xv72L
                                 #'text--gq6o- text--is-m--pqiL-'
@@ -205,31 +206,25 @@ def run(playwright: Playwright) -> None:
                         x = x - 1
                     x = x + 1
                     allEpisodes.append(seasonEpisodes)
-            
-                #Might be worth checking if the table exists so I can make posts for new shows and not just new seasons/episodes
-                dbName = show[0].split("/", 3)[-1]
-                dbName = dbName.replace("-", "_")
-                firstLetter = dbName[0]
-                if ord(firstLetter) >= 48 and ord(firstLetter) <= 57:
-                    dbName = '_' +dbName
 
+                
+                #Start Making Changes Here
+                #Switching to an episode database means show[1] is our show_title so we don't need dbName anymore
+                show_title = show[1]
+                show_title = show_title.replace('"','""')
                 c = conn.cursor()
-                checkForTableQuery = ''' SELECT name FROM sqlite_master WHERE type ='table' AND name = "''' + dbName + '''"'''
+                checkForTableQuery = '''SELECT * FROM episodes WHERE show_title = "''' + \
+                    show_title + '''"'''
                 tableResult = c.execute(checkForTableQuery).fetchone()
                 createShowPost = False
-                
-                #If there is not a table for the show in our database
-                #Create the table and write a tweet announcing a new show
+
+                #No Longer need to create a new table as we only store episodes now
+                #If we didn't find a single episode with the show_title 
                 if tableResult == None:
                     createShowPost = True
-                    tweetString = "New Show added to Crunchyroll Catalog\n" + showTitle + "\n" +  showURL
-                    client.create_tweet(text = tweetString)
-                    c = conn.cursor()
-                    createTableQuery = '''CREATE TABLE IF NOT EXISTS ''' + dbName + \
-                    ''' (season_title,season_number, episode_number, episode_title,link PRIMARY KEY, url_title, language)'''
-                    c.execute(createTableQuery)
-
-
+                    tweetString = "New Show added to Crunchyroll Catalog\n" + showTitle + "\n" + showURL
+                    client.create_tweet(text=tweetString)
+            
                 for x in range(len(seasons)):
                     seasonTitle = seasons[x]
                     seasonName = seasonTitle.split(" ", 2)[-1]
@@ -237,8 +232,8 @@ def run(playwright: Playwright) -> None:
                     createSeasonPost = False
 
                     c = conn.cursor()
-                
-                    checkForSeasonQuery = '''SELECT EXISTS(SELECT 1 FROM ''' + dbName + ''' WHERE season_title =  "''' + seasonName + '''" ) '''
+
+                    checkForSeasonQuery = '''SELECT EXISTS(SELECT * FROM episodes WHERE show_title = "''' + show_title + '''" AND season_title = "''' + seasonName +'''") '''
                     result = c.execute(checkForSeasonQuery).fetchone()
                     
                     
@@ -247,7 +242,7 @@ def run(playwright: Playwright) -> None:
                             createSeasonPost = True
 
                     for y in range(len(allEpisodes[x])):
-                        link = 'https://beta.crunchyroll.com'+ allEpisodes[x][y][1]
+                        link = 'https://www.crunchyroll.com'+ allEpisodes[x][y][1]
                         language = "null"
                         if allEpisodes[x][y][2] == "Subtitled":
                             language = "Japanese"
@@ -301,8 +296,7 @@ def run(playwright: Playwright) -> None:
                         urltitle = urlSplit[1]
                         link = urlSplit[0]
 
-                        checkForEpisodeQuery = '''SELECT EXISTS(SELECT 1 FROM "''' + \
-                            dbName + '''" WHERE link = "''' + link + '''")'''
+                        checkForEpisodeQuery = '''SELECT EXISTS(SELECT 1 FROM episodes WHERE link = "''' + link + '''")'''
                         c = conn.cursor()
                         episodeResult = c.execute(checkForEpisodeQuery).fetchone()
 
@@ -313,11 +307,11 @@ def run(playwright: Playwright) -> None:
                         if createShowPost == True or createSeasonPost == True:
                             c=conn.cursor()
                             if episodeResult[0] == 1:
-                                query = '''UPDATE ''' + dbName + ''' SET season_title = ?, season_number = ?, episode_number =?, episode_title = ? , url_title = ?, language = ? WHERE link = "''' + link + '''"'''
-                                c.execute(query, (seasonName, seasonNum,episodeNum, episodeTitle, urltitle, language))
+                                query = '''UPDATE episodes SET show_title = ? , season_title = ?, season_number = ?, episode_number =?, episode_title = ? , url_title = ?, language = ? WHERE link = "''' + link + '''"'''
+                                c.execute(query, (show_title,seasonName, seasonNum,episodeNum, episodeTitle, urltitle, language))
                             else:
-                                query = '''INSERT INTO ''' + dbName + ''' VALUES (?,?,?,?,?,?,?)'''
-                                c.execute(query, (seasonName, seasonNum,episodeNum, episodeTitle, link, urltitle, language))
+                                query = '''INSERT INTO episodes VALUES (?,?,?,?,?,?,?,?)'''
+                                c.execute(query, (show_title,seasonName, seasonNum,episodeNum, episodeTitle, link, urltitle, language))
 
                                 # If we aren't a new show we know to add a post for this new season
                                 # Add current seasonName and Language to list
@@ -337,8 +331,8 @@ def run(playwright: Playwright) -> None:
                             #EpisodesToTweet
                             if episodeResult[0] == 0:
                                 c = conn.cursor()
-                                query = '''INSERT INTO ''' + dbName + ''' VALUES (?,?,?,?,?,?,?)'''
-                                c.execute(query, (seasonName, seasonNum,episodeNum, episodeTitle, link, urltitle, language))
+                                query = '''INSERT INTO episodes VALUES (?,?,?,?,?,?,?,?)'''
+                                c.execute(query, (show_title,seasonName, seasonNum,episodeNum, episodeTitle, link, urltitle, language))
                                 if len(episodesToTweet) == 0:
                                     episodesToTweet.append((seasonNum,episodeNum,episodeTitle,[(link+'/'+urltitle,language)]))
                                 else:
@@ -353,8 +347,8 @@ def run(playwright: Playwright) -> None:
 
                             else:
                                 #Episode does exist so just update the data to the new one just in case it's something like where crunchyroll doesn't include the title of an episode
-                                query = '''UPDATE ''' + dbName + ''' SET season_title = ?, season_number = ?, episode_number =?, episode_title = ? , url_title = ?, language = ? WHERE link = "''' + link + '''"'''
-                                c.execute(query, (seasonName, seasonNum,episodeNum, episodeTitle, urltitle, language))
+                                query = '''UPDATE episodes SET show_title = ?, season_title = ?, season_number = ?, episode_number =?, episode_title = ? , url_title = ?, language = ? WHERE link = "''' + link + '''"'''
+                                c.execute(query, (show_title,seasonName, seasonNum,episodeNum, episodeTitle, urltitle, language))
 
                 # If We didn't make a post for the show that means were either have new seasons
                 # new episodes or both
@@ -381,6 +375,7 @@ def run(playwright: Playwright) -> None:
                             
                     if seasonTweetText != "":
                         client.create_tweet(text=seasonStarter + seasonTweetText)
+                        print("")
 
                     for et in episodesToTweet:
                         episodeStarter = "New Episode for " + showTitle + "\nS: " + et[0] + " E: " + et[1] + " Title: "  + et[2]+  "\n"

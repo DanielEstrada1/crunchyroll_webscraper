@@ -37,28 +37,24 @@ def run(playwright: Playwright) -> None:
             print(soup)
             exit()
 
-        # Click text=Login Queue Random Search >> svg >> nth=0
-        page.locator("text=Login Queue Random Search >> svg").first.click()
-        page.wait_for_url("https://www.crunchyroll.com/login?next=%2F")
-
-        # Click input[name="login_form\[name\]"]
-        page.locator("input[name=\"login_form\\[name\\]\"]").click()
-
-        # Fill input[name="login_form\[name\]"]
-        page.locator("input[name=\"login_form\\[name\\]\"]").fill(
-            os.environ.get('loginUser'))
-
-        # Click input[name="login_form\[password\]"]
-        page.locator("input[name=\"login_form\\[password\\]\"]").click()
-
-        # Fill input[name="login_form\[password\]"]
-        page.locator("input[name=\"login_form\\[password\\]\"]").fill(
-            os.environ.get('password'))
-
-        # Click button:has-text("Log In")
-        page.locator("button:has-text(\"Log In\")").click()
-        page.wait_for_url("https://beta.crunchyroll.com/")
-
+        # Click div[role="button"]:has-text("Account menu")
+        page.locator("div[role=\"button\"]:has-text(\"Account menu\")").click()
+        # Click h5:has-text("Log In")
+        page.locator("h5:has-text(\"Log In\")").click()
+        page.wait_for_load_state('networkidle')
+        # Click input[name="username"]
+        page.locator("input[name=\"username\"]").click()
+        # Fill input[name="username"]
+        page.locator("input[name=\"username\"]").fill(os.environ.get('loginUser'))
+        # Click input[name="password"]
+        page.locator("input[name=\"password\"]").click()
+        # Fill input[name="password"]
+        page.locator("input[name=\"password\"]").fill(os.environ.get('password'))
+        
+        
+        page.locator("button:has-text(\"LOG IN\")").click()
+        page.wait_for_url("https://www.crunchyroll.com/")
+        
         # ---------------------
         context.storage_state(path="auth.json")
         with open('time.txt', 'w') as file:

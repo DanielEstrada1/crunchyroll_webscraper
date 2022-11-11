@@ -14,8 +14,8 @@ def run(playwright: Playwright) -> None:
 
     # Go to https://www.crunchyroll.com
     page.goto("https://www.crunchyroll.com")
-    page.wait_for_url("https://beta.crunchyroll.com/")
-    page.goto("https://beta.crunchyroll.com/videos/alphabetical")
+    page.wait_for_url("https://www.crunchyroll.com/")
+    page.goto("https://www.crunchyroll.com/videos/alphabetical")
 
     showSet = set()
 
