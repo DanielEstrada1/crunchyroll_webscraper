@@ -22,6 +22,7 @@ def run(playwright: Playwright) -> None:
     URL = 'https://www.crunchyroll.com'
 
     conn = sqlite3.connect('allEpisodes.db')
+    showConn = sqlite3.connect('showData.db')
 
     load_dotenv()
 
@@ -33,7 +34,7 @@ def run(playwright: Playwright) -> None:
                            bearer_token=os.environ.get('bearer_token'))
 
     c= conn.cursor()
-    createTableQuery = '''CREATE TABLE IF NOT EXISTS episodes(show_title,season_title,season_number INTEGER, episode_number, episode_title,link PRIMARY KEY, url_title, language)'''
+    createTableQuery = '''CREATE TABLE IF NOT EXISTS episodes(show_url,season_title,season_number INTEGER, episode_number, episode_title,link PRIMARY KEY, url_title, language)'''
     c.execute(createTableQuery)
 
     shows= []
@@ -209,12 +210,12 @@ def run(playwright: Playwright) -> None:
 
                 
                 #Start Making Changes Here
+                #Potentially make show[0] = show[0][8:17] to save the unique show identifier instead of the whole series href
+                show[0] = show[0][8:17]
                 #Switching to an episode database means show[1] is our show_title so we don't need dbName anymore
-                show_title = show[1]
-                show_title = show_title.replace('"','""')
                 c = conn.cursor()
-                checkForTableQuery = '''SELECT * FROM episodes WHERE show_title = "''' + \
-                    show_title + '''"'''
+                checkForTableQuery = '''SELECT * FROM episodes WHERE show_url = "''' + \
+                    show[0] + '''"'''
                 tableResult = c.execute(checkForTableQuery).fetchone()
                 createShowPost = False
 
@@ -233,7 +234,7 @@ def run(playwright: Playwright) -> None:
 
                     c = conn.cursor()
 
-                    checkForSeasonQuery = '''SELECT EXISTS(SELECT * FROM episodes WHERE show_title = "''' + show_title + '''" AND season_title = "''' + seasonName +'''") '''
+                    checkForSeasonQuery = '''SELECT EXISTS(SELECT * FROM episodes WHERE show_url = "''' + show[0] + '''" AND season_title = "''' + seasonName +'''") '''
                     result = c.execute(checkForSeasonQuery).fetchone()
                     
                     
@@ -307,11 +308,11 @@ def run(playwright: Playwright) -> None:
                         if createShowPost == True or createSeasonPost == True:
                             c=conn.cursor()
                             if episodeResult[0] == 1:
-                                query = '''UPDATE episodes SET show_title = ? , season_title = ?, season_number = ?, episode_number =?, episode_title = ? , url_title = ?, language = ? WHERE link = "''' + link + '''"'''
-                                c.execute(query, (show_title,seasonName, seasonNum,episodeNum, episodeTitle, urltitle, language))
+                                query = '''UPDATE episodes SET show_url = ? , season_title = ?, season_number = ?, episode_number =?, episode_title = ? , url_title = ?, language = ? WHERE link = "''' + link + '''"'''
+                                c.execute(query, (show[0],seasonName, seasonNum,episodeNum, episodeTitle, urltitle, language))
                             else:
                                 query = '''INSERT INTO episodes VALUES (?,?,?,?,?,?,?,?)'''
-                                c.execute(query, (show_title,seasonName, seasonNum,episodeNum, episodeTitle, link, urltitle, language))
+                                c.execute(query, (show[0],seasonName, seasonNum,episodeNum, episodeTitle, link, urltitle, language))
 
                                 # If we aren't a new show we know to add a post for this new season
                                 # Add current seasonName and Language to list
@@ -332,7 +333,7 @@ def run(playwright: Playwright) -> None:
                             if episodeResult[0] == 0:
                                 c = conn.cursor()
                                 query = '''INSERT INTO episodes VALUES (?,?,?,?,?,?,?,?)'''
-                                c.execute(query, (show_title,seasonName, seasonNum,episodeNum, episodeTitle, link, urltitle, language))
+                                c.execute(query, (show[0],seasonName, seasonNum,episodeNum, episodeTitle, link, urltitle, language))
                                 if len(episodesToTweet) == 0:
                                     episodesToTweet.append((seasonNum,episodeNum,episodeTitle,[(link+'/'+urltitle,language)]))
                                 else:
@@ -347,8 +348,8 @@ def run(playwright: Playwright) -> None:
 
                             else:
                                 #Episode does exist so just update the data to the new one just in case it's something like where crunchyroll doesn't include the title of an episode
-                                query = '''UPDATE episodes SET show_title = ?, season_title = ?, season_number = ?, episode_number =?, episode_title = ? , url_title = ?, language = ? WHERE link = "''' + link + '''"'''
-                                c.execute(query, (show_title,seasonName, seasonNum,episodeNum, episodeTitle, urltitle, language))
+                                query = '''UPDATE episodes SET show_url = ?, season_title = ?, season_number = ?, episode_number =?, episode_title = ? , url_title = ?, language = ? WHERE link = "''' + link + '''"'''
+                                c.execute(query, (show[0],seasonName, seasonNum,episodeNum, episodeTitle, urltitle, language))
 
                 # If We didn't make a post for the show that means were either have new seasons
                 # new episodes or both
@@ -378,6 +379,10 @@ def run(playwright: Playwright) -> None:
                         print("")
 
                     for et in episodesToTweet:
+                        if len(et[2]) > 20:
+                            tempList = list(et)
+                            tempList[2] = tempList[2][0:20]
+                            et = tuple(tempList)
                         episodeStarter = "New Episode for " + showTitle + "\nS: " + et[0] + " E: " + et[1] + " Title: "  + et[2]+  "\n"
                         currLength = len(episodeStarter)
                         episodeTweetText = ""
@@ -394,9 +399,27 @@ def run(playwright: Playwright) -> None:
                         client.create_tweet(text=episodeStarter + episodeTweetText)
 
                 conn.commit()
+            
+                #Update the show data table to reflect language counts
+                #Create string of langauges and episodes for this series
+                languageString = ""
+                c = conn.cursor()
+                query = '''SELECT language, COUNT(*) FROM episodes WHERE show_url= "''' +show[0] + '''" GROUP BY language ORDER BY language'''
+                for ep in c.execute(query).fetchall():
+                    languageString += str(ep[0]) + "(" + str(ep[1]) + ") "
+            
+                d = showConn.cursor()
+                #createShowTableQuery = '''CREATE TABLE IF NOT EXISTS shows(show_id, show_title, show_picUrl, show_counts)'''
+            
+                #update accordingly
+                query = '''UPDATE shows SET show_counts = ? WHERE show_id ="''' + \
+                    show[0] + '''"'''
+                d.execute(query,[languageString])
+                showConn.commit()
     
     # ---------------------
     conn.close()
+    showConn.close()
     context.close()
     browser.close()
     display.stop()
